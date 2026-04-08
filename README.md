@@ -47,37 +47,43 @@ All clients (bot, web, mobile) use the **same REST API**. No duplicate logic, no
 
 ## Setup
 
-### 1. Supabase schema (one-time)
+### 1. Create the database schema in Supabase (one-time, ~30 seconds)
 
-You have **two options** — pick whichever you prefer:
+1. Sign in at https://supabase.com and create a new project (free tier is fine)
+2. Wait for the project to finish provisioning
+3. Open **SQL Editor** in the left sidebar → click **New query**
+4. Open `backend/db/schema.sql` from this repo, copy the entire contents, paste it into the editor
+5. Click the green **Run** button (bottom-right). You should see *"Success. No rows returned."*
 
-**Option A: automated (recommended)**
-```bash
-cd backend
-cp .env.example .env
-# edit .env: set SUPABASE_URL, SUPABASE_KEY, and SUPABASE_DB_URL (with your DB password)
-npm install
-npm run migrate
-```
-The migration runner connects via `pg`, walks `backend/migrations/`, and runs each `.sql` file in order. It's idempotent — safe to re-run.
+You now have 3 tables (`users`, `meals`, `events`) with indexes. Row-Level Security is disabled because the backend acts as a trusted server-side intermediary using the anon key. You can verify by opening **Table Editor** in the sidebar and seeing the three tables.
 
-**Option B: manual via the Supabase UI**
-1. Open your Supabase project → **SQL Editor → New query**
-2. Paste the contents of `backend/migrations/001_init.sql`
-3. Click **Run**
-
-Either way creates 3 tables (`users`, `meals`, `events`) with indexes and disables RLS so the backend (a trusted server-side intermediary) can read/write with the publishable key.
+> No code-based migration step is needed. The backend reads and writes through the Supabase REST API and never runs DDL itself.
 
 ### 2. Backend
 
 ```bash
 cd backend
 cp .env.example .env
-# edit .env: set SUPABASE_URL and SUPABASE_KEY from your Supabase project settings
+```
+Edit `backend/.env` and fill in:
+- `SUPABASE_URL` — from Supabase → **Project Settings → API → Project URL**
+- `SUPABASE_ANON_KEY` — from Supabase → **Project Settings → API Keys → anon (public)**
+
+Then:
+```bash
 npm install
 npm start
 ```
-Backend runs at `http://localhost:4000`. Test with `curl http://localhost:4000/health`.
+
+Expected output:
+```
+[db] connected to Supabase: https://<your-project>.supabase.co
+[experiments] Statsig initialized      ← (or "using internal bucketing" if no key)
+[cron] daily reminder "0 19 * * *", summary "0 21 * * *"
+[backend] listening on :4000
+```
+
+Smoke test: `curl http://localhost:4000/health` → `{"ok":true}`
 
 ### 3. Telegram bot
 
@@ -115,14 +121,13 @@ npm start
 **backend/.env**
 ```
 PORT=4000
-SUPABASE_URL=https://xxxxxxxxxxxxxx.supabase.co
-SUPABASE_KEY=sb_publishable_xxxxxxxxxxxxxxxxxxxxxx
-SUPABASE_DB_URL=postgresql://postgres:YOUR-PASSWORD@db.xxxxxxxxxxxxxx.supabase.co:5432/postgres
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_ANON_KEY=your_anon_public_key
 STATSIG_SERVER_KEY=          # optional: real Statsig key. blank = internal bucketing
 DAILY_REMINDER_CRON=0 19 * * *
 DAILY_SUMMARY_CRON=0 21 * * *
 ```
-> `SUPABASE_DB_URL` is only needed for `npm run migrate`. The running backend uses `SUPABASE_URL` + `SUPABASE_KEY` (REST API) for everything else.
+> Get `SUPABASE_ANON_KEY` from your Supabase project → **Settings → API Keys → anon (public)**.
 
 **bot/.env**
 ```
@@ -172,7 +177,7 @@ GET    /api/analytics/summary         high-level KPIs
 - **n8n workflow provided as an importable JSON** in `n8n/` since the spec wording says "build in n8n". The Node bot is the primary implementation because meal CRUD is cleaner in code; the n8n workflow handles the A/B onboarding flow visually and calls the same backend.
 - **Polling instead of WebSockets** for mobile/dashboard live sync. Reason: simpler, sufficient for this scope. A production system could use Supabase Realtime channels (built into Postgres logical replication) for true push.
 - **No auth on the API.** Reason: scope. The bot is the trust boundary (verified by Telegram). For production, add JWT or API keys for the dashboard/mobile.
-- **Supabase (Postgres) instead of MongoDB** — managed, free tier, proper relational schema, and the publishable key + RLS-off pattern lets the trusted backend talk to it without managing a service-role secret. Schema lives in `backend/migrations/001_init.sql`.
+- **Supabase (Postgres) instead of MongoDB** — managed, free tier, proper relational schema. The backend uses the anon key + RLS-off pattern (the bot is the trust boundary), so there's no service-role secret to manage. Schema lives in `backend/db/schema.sql` and is applied once via the Supabase SQL Editor.
 - **Push notifications** are wired end-to-end via `expo-server-sdk` + `node-cron`. The mobile app registers an Expo push token on launch, the backend stores it on the user, and two cron jobs send a daily reminder and a daily summary. Manual triggers exist at `POST /api/users/_test/send-reminders` and `/_test/send-summaries` for demoing in the walkthrough video without waiting for the cron.
 
 ## Time breakdown (approximate)

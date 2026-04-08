@@ -1,5 +1,6 @@
--- CalorAI initial schema for Supabase / Postgres
--- Run this in the Supabase SQL Editor (Dashboard → SQL → New query → paste → Run)
+-- CalorAI database schema for Supabase / Postgres
+-- HOW TO APPLY: open Supabase → SQL Editor → New query → paste this entire file → Run.
+-- This is idempotent (`if not exists`), so it's safe to re-run.
 
 create extension if not exists "pgcrypto";
 

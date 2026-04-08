@@ -2,10 +2,10 @@ import { createClient } from '@supabase/supabase-js';
 import 'dotenv/config';
 
 const url = process.env.SUPABASE_URL;
-const key = process.env.SUPABASE_KEY;
+const key = process.env.SUPABASE_ANON_KEY;
 
 if (!url || !key) {
-  console.error('[db] SUPABASE_URL or SUPABASE_KEY missing in .env');
+  console.error('[db] SUPABASE_URL or SUPABASE_ANON_KEY missing in backend/.env');
   process.exit(1);
 }
 
@@ -17,7 +17,7 @@ export async function pingDB() {
   const { error } = await supabase.from('users').select('id').limit(1);
   if (error) {
     console.error('[db] Supabase ping failed:', error.message);
-    console.error('[db] Did you run backend/migrations/001_init.sql in the Supabase SQL editor?');
+    console.error('[db] Did you run backend/db/schema.sql in the Supabase SQL editor?');
     process.exit(1);
   }
   console.log('[db] connected to Supabase:', url);
