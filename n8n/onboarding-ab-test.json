@@ -3,6 +3,17 @@
   "nodes": [
     {
       "parameters": {
+        "content": "## CalorAI A/B Onboarding — Setup\n\n**1.** Make sure the backend is running:\n`cd backend && npm start`\n(should be live at http://localhost:4000)\n\n**2.** Stop the Node bot if it's running — Telegram allows only ONE poller per bot token at a time:\n`Ctrl+C` in the `bot/` terminal\n\n**3.** Create a Telegram credential in n8n:\n- Click any Telegram node below → **Credential to connect with** → **Create New**\n- Name: `Telegram account`\n- **Access Token:** `8496575972:AAGHKQ8Uc7OLiAz3_qO2I3FIdfiwu7Vjfp0`\n- Save\n\n**4.** Activate the workflow (toggle top-right)\n\n**5.** In Telegram, send `/start` to your bot. Watch the Executions tab.\n\n---\nThe HTTP Request nodes call `http://localhost:4000` directly — make sure n8n is running on the same machine as the backend.",
+        "height": 420,
+        "width": 460
+      },
+      "name": "📌 README — read first",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [80, -120]
+    },
+    {
+      "parameters": {
         "updates": ["message"],
         "additionalFields": {}
       },
@@ -10,13 +21,19 @@
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1,
       "position": [240, 300],
-      "credentials": { "telegramApi": { "id": "telegram", "name": "Telegram account" } }
+      "credentials": {
+        "telegramApi": { "id": "telegram", "name": "Telegram account" }
+      }
     },
     {
       "parameters": {
         "conditions": {
           "string": [
-            { "value1": "={{$json[\"message\"][\"text\"]}}", "operation": "equal", "value2": "/start" }
+            {
+              "value1": "={{ $json.message.text }}",
+              "operation": "equal",
+              "value2": "/start"
+            }
           ]
         }
       },
@@ -28,10 +45,11 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{$env.BACKEND_URL}}/api/users",
+        "url": "http://localhost:4000/api/users",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={ \"telegramId\": \"{{$json['message']['from']['id']}}\", \"username\": \"{{$json['message']['from']['username']}}\", \"firstName\": \"{{$json['message']['from']['first_name']}}\" }"
+        "jsonBody": "={\n  \"telegramId\": \"{{ $json.message.from.id }}\",\n  \"username\": \"{{ $json.message.from.username }}\",\n  \"firstName\": \"{{ $json.message.from.first_name }}\"\n}",
+        "options": {}
       },
       "name": "Upsert User (Backend → Statsig)",
       "type": "n8n-nodes-base.httpRequest",
@@ -42,7 +60,11 @@
       "parameters": {
         "conditions": {
           "string": [
-            { "value1": "={{$json[\"group\"]}}", "operation": "equal", "value2": "control" }
+            {
+              "value1": "={{ $json.group }}",
+              "operation": "equal",
+              "value2": "control"
+            }
           ]
         }
       },
@@ -53,90 +75,158 @@
     },
     {
       "parameters": {
-        "chatId": "={{$node['Telegram Trigger'].json['message']['chat']['id']}}",
-        "text": "Hi! Welcome to CalorAI. Use /log <meal> to log a meal."
+        "operation": "sendMessage",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "Hi! Welcome to CalorAI. Use /log <meal> to log a meal, /meals to view them.",
+        "additionalFields": {}
       },
       "name": "Send Control Message",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1,
-      "position": [1140, 160],
-      "credentials": { "telegramApi": { "id": "telegram", "name": "Telegram account" } }
+      "position": [1140, 140],
+      "credentials": {
+        "telegramApi": { "id": "telegram", "name": "Telegram account" }
+      }
     },
     {
       "parameters": {
-        "chatId": "={{$node['Telegram Trigger'].json['message']['chat']['id']}}",
-        "text": "👋 Welcome to CalorAI! Step 1/3: Log meals consistently for best results."
+        "operation": "sendMessage",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "👋 Welcome to CalorAI! I help you track meals and reach your health goals.\n\nStep 1/3: I work best when you log meals consistently. Quick logging takes < 10 seconds.",
+        "additionalFields": {}
       },
       "name": "Onboarding Step 1",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1,
-      "position": [1140, 300],
-      "credentials": { "telegramApi": { "id": "telegram", "name": "Telegram account" } }
-    },
-    {
-      "parameters": { "amount": 2, "unit": "seconds" },
-      "name": "Wait",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1,
-      "position": [1340, 300]
+      "position": [1140, 340],
+      "credentials": {
+        "telegramApi": { "id": "telegram", "name": "Telegram account" }
+      }
     },
     {
       "parameters": {
-        "chatId": "={{$node['Telegram Trigger'].json['message']['chat']['id']}}",
-        "text": "Step 2/3: Use /log <meal> [calories] to record meals quickly."
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "name": "Wait 2s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1340, 340],
+      "webhookId": "wait-1"
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "Step 2/3: You can log a meal anytime by typing:\n/log Chicken salad 450\n\nOr just /log Pizza and skip calories.",
+        "additionalFields": {}
       },
       "name": "Onboarding Step 2",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1,
-      "position": [1540, 300],
-      "credentials": { "telegramApi": { "id": "telegram", "name": "Telegram account" } }
-    },
-    {
-      "parameters": { "amount": 2, "unit": "seconds" },
-      "name": "Wait2",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1,
-      "position": [1740, 300]
+      "position": [1540, 340],
+      "credentials": {
+        "telegramApi": { "id": "telegram", "name": "Telegram account" }
+      }
     },
     {
       "parameters": {
-        "chatId": "={{$node['Telegram Trigger'].json['message']['chat']['id']}}",
-        "text": "Step 3/3: View with /meals, edit with /edit, delete with /delete. You're set! 🥗"
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "name": "Wait 2s (2)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1740, 340],
+      "webhookId": "wait-2"
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "Step 3/3: View your meals with /meals, edit with /edit, delete with /delete.\n\nYou're all set! Try logging your first meal now. 🥗",
+        "additionalFields": {}
       },
       "name": "Onboarding Step 3",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1,
-      "position": [1940, 300],
-      "credentials": { "telegramApi": { "id": "telegram", "name": "Telegram account" } }
+      "position": [1940, 340],
+      "credentials": {
+        "telegramApi": { "id": "telegram", "name": "Telegram account" }
+      }
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{$env.BACKEND_URL}}/api/events",
+        "url": "http://localhost:4000/api/events",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={ \"userId\": \"{{$node['Upsert User (Backend → Statsig)'].json['user']['_id']}}\", \"eventName\": \"onboarding_completed\", \"properties\": {} }"
+        "jsonBody": "={\n  \"userId\": \"{{ $('Upsert User (Backend → Statsig)').item.json.user._id }}\",\n  \"eventName\": \"onboarding_completed\",\n  \"properties\": { \"source\": \"n8n\" }\n}",
+        "options": {}
       },
       "name": "Log onboarding_completed",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [2160, 300]
+      "position": [2160, 340]
     }
   ],
   "connections": {
-    "Telegram Trigger": { "main": [[{ "node": "Is /start", "type": "main", "index": 0 }]] },
-    "Is /start": { "main": [[{ "node": "Upsert User (Backend → Statsig)", "type": "main", "index": 0 }], []] },
-    "Upsert User (Backend → Statsig)": { "main": [[{ "node": "Group?", "type": "main", "index": 0 }]] },
+    "Telegram Trigger": {
+      "main": [
+        [{ "node": "Is /start", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is /start": {
+      "main": [
+        [{ "node": "Upsert User (Backend → Statsig)", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Upsert User (Backend → Statsig)": {
+      "main": [
+        [{ "node": "Group?", "type": "main", "index": 0 }]
+      ]
+    },
     "Group?": {
       "main": [
         [{ "node": "Send Control Message", "type": "main", "index": 0 }],
         [{ "node": "Onboarding Step 1", "type": "main", "index": 0 }]
       ]
     },
-    "Onboarding Step 1": { "main": [[{ "node": "Wait", "type": "main", "index": 0 }]] },
-    "Wait": { "main": [[{ "node": "Onboarding Step 2", "type": "main", "index": 0 }]] },
-    "Onboarding Step 2": { "main": [[{ "node": "Wait2", "type": "main", "index": 0 }]] },
-    "Wait2": { "main": [[{ "node": "Onboarding Step 3", "type": "main", "index": 0 }]] },
-    "Onboarding Step 3": { "main": [[{ "node": "Log onboarding_completed", "type": "main", "index": 0 }]] }
-  }
+    "Onboarding Step 1": {
+      "main": [
+        [{ "node": "Wait 2s", "type": "main", "index": 0 }]
+      ]
+    },
+    "Wait 2s": {
+      "main": [
+        [{ "node": "Onboarding Step 2", "type": "main", "index": 0 }]
+      ]
+    },
+    "Onboarding Step 2": {
+      "main": [
+        [{ "node": "Wait 2s (2)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Wait 2s (2)": {
+      "main": [
+        [{ "node": "Onboarding Step 3", "type": "main", "index": 0 }]
+      ]
+    },
+    "Onboarding Step 3": {
+      "main": [
+        [{ "node": "Log onboarding_completed", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "versionId": "calorai-onboarding-v1",
+  "tags": []
 }
