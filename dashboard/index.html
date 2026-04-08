@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CalorAI Analytics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      * { box-sizing: border-box; }
+      html, body, #root { height: 100%; }
+      body {
+        margin: 0;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        background: #05070f;
+        color: #e6e9f2;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background:
+          radial-gradient(circle at 15% 10%, rgba(99, 102, 241, 0.25), transparent 40%),
+          radial-gradient(circle at 85% 20%, rgba(236, 72, 153, 0.20), transparent 45%),
+          radial-gradient(circle at 50% 90%, rgba(16, 185, 129, 0.18), transparent 50%);
+        pointer-events: none;
+        z-index: 0;
+      }
+      #root { position: relative; z-index: 1; }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-thumb { background: #2a3148; border-radius: 4px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
