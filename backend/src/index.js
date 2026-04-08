@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import { connectDB } from './db.js';
+import { pingDB } from './db.js';
 import { initExperiments } from './services/experiments.js';
 import { startCronJobs } from './services/notifications.js';
 import users from './routes/users.js';
@@ -22,7 +22,7 @@ app.use('/api/analytics', analytics);
 const PORT = process.env.PORT || 4000;
 
 (async () => {
-  await connectDB();
+  await pingDB();
   await initExperiments();
   startCronJobs();
   app.listen(PORT, () => console.log(`[backend] listening on :${PORT}`));

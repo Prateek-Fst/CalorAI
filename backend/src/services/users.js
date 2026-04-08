@@ -1,27 +1,76 @@
-import { User } from '../db.js';
+import { supabase, toCamel } from '../db.js';
 import { logEvent } from './events.js';
 import { getOrAssign } from './experiments.js';
 
+export async function findUserByTelegramId(telegramId) {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('telegram_id', String(telegramId))
+    .maybeSingle();
+  if (error) throw error;
+  return toCamel(data);
+}
+
 export async function getOrCreateUser({ telegramId, username, firstName }) {
-  let user = await User.findOne({ telegramId: String(telegramId) });
+  let user = await findUserByTelegramId(telegramId);
   let isNew = false;
+
   if (!user) {
-    user = await User.create({ telegramId: String(telegramId), username, firstName });
+    const { data, error } = await supabase
+      .from('users')
+      .insert({
+        telegram_id: String(telegramId),
+        username: username || null,
+        first_name: firstName || null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    user = toCamel(data);
     isNew = true;
-    await logEvent(user._id, 'user_created', { telegramId: user.telegramId });
+    await logEvent(user.id, 'user_created', { telegramId: user.telegramId });
   }
-  user.lastActiveAt = new Date();
-  await user.save();
-  const group = await getOrAssign(user);
-  return { user, group, isNew };
+
+  // Touch last_active_at
+  await supabase
+    .from('users')
+    .update({ last_active_at: new Date().toISOString() })
+    .eq('id', user.id);
+
+  const { user: updatedUser, group } = await getOrAssign(user);
+  return { user: updatedUser, group, isNew };
 }
 
 export async function setOnboardingStep(userId, step, completed = false) {
-  const update = { onboardingStep: step };
-  if (completed) update.onboardingCompleted = true;
-  return User.findByIdAndUpdate(userId, update, { new: true });
+  const update = { onboarding_step: step };
+  if (completed) update.onboarding_completed = true;
+  const { data, error } = await supabase
+    .from('users')
+    .update(update)
+    .eq('id', userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return toCamel(data);
 }
 
 export async function markBlocked(telegramId) {
-  return User.findOneAndUpdate({ telegramId: String(telegramId) }, { blocked: true });
+  const { error } = await supabase
+    .from('users')
+    .update({ blocked: true })
+    .eq('telegram_id', String(telegramId));
+  if (error) throw error;
+  return { ok: true };
+}
+
+export async function setExpoPushToken(telegramId, token) {
+  const { data, error } = await supabase
+    .from('users')
+    .update({ expo_push_token: token })
+    .eq('telegram_id', String(telegramId))
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return toCamel(data);
 }

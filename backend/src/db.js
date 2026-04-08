@@ -1,47 +1,40 @@
-import mongoose from 'mongoose';
+import { createClient } from '@supabase/supabase-js';
 import 'dotenv/config';
 
-export async function connectDB() {
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/calorai';
-  await mongoose.connect(uri);
-  console.log('[db] connected:', uri);
+const url = process.env.SUPABASE_URL;
+const key = process.env.SUPABASE_KEY;
+
+if (!url || !key) {
+  console.error('[db] SUPABASE_URL or SUPABASE_KEY missing in .env');
+  process.exit(1);
 }
 
-const userSchema = new mongoose.Schema(
-  {
-    telegramId: { type: String, unique: true, required: true, index: true },
-    username: String,
-    firstName: String,
-    experimentGroup: { type: String, enum: ['control', 'test', null], default: null },
-    onboardingStep: { type: Number, default: 0 },
-    onboardingCompleted: { type: Boolean, default: false },
-    blocked: { type: Boolean, default: false },
-    expoPushToken: { type: String, default: null },
-    lastActiveAt: { type: Date, default: Date.now },
-  },
-  { timestamps: true }
-);
+export const supabase = createClient(url, key, {
+  auth: { persistSession: false },
+});
 
-const mealSchema = new mongoose.Schema(
-  {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    name: { type: String, required: true },
-    calories: Number,
-    notes: String,
-    loggedAt: { type: Date, default: Date.now },
-  },
-  { timestamps: true }
-);
+export async function pingDB() {
+  const { error } = await supabase.from('users').select('id').limit(1);
+  if (error) {
+    console.error('[db] Supabase ping failed:', error.message);
+    console.error('[db] Did you run backend/migrations/001_init.sql in the Supabase SQL editor?');
+    process.exit(1);
+  }
+  console.log('[db] connected to Supabase:', url);
+}
 
-const eventSchema = new mongoose.Schema(
-  {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
-    eventName: { type: String, required: true, index: true },
-    properties: { type: Object, default: {} },
-  },
-  { timestamps: true }
-);
-
-export const User = mongoose.model('User', userSchema);
-export const Meal = mongoose.model('Meal', mealSchema);
-export const Event = mongoose.model('Event', eventSchema);
+/**
+ * Convert a snake_case Postgres row to the camelCase shape the API/clients expect.
+ * Also aliases `id` → `_id` so existing bot/dashboard/mobile code keeps working.
+ */
+export function toCamel(row) {
+  if (!row) return row;
+  if (Array.isArray(row)) return row.map(toCamel);
+  const out = {};
+  for (const [k, v] of Object.entries(row)) {
+    const camel = k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    out[camel] = v;
+  }
+  if (out.id) out._id = out.id;
+  return out;
+}

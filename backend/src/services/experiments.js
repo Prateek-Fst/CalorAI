@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { supabase, toCamel } from '../db.js';
 import { logEvent } from './events.js';
 
 /**
@@ -47,15 +48,24 @@ export function assignGroup(unitId) {
   return hashBucket(unitId);
 }
 
+/**
+ * Ensure the user has an experiment group. `user` is a camelCase row from db.toCamel.
+ * Returns the (possibly updated) user row + the group.
+ */
 export async function getOrAssign(user) {
-  if (user.experimentGroup) return user.experimentGroup;
+  if (user.experimentGroup) return { user, group: user.experimentGroup };
   const group = assignGroup(user.telegramId);
-  user.experimentGroup = group;
-  await user.save();
-  await logEvent(user._id, 'experiment_exposure', {
+  const { data, error } = await supabase
+    .from('users')
+    .update({ experiment_group: group })
+    .eq('id', user.id)
+    .select()
+    .single();
+  if (error) throw error;
+  await logEvent(user.id, 'experiment_exposure', {
     experiment: EXPERIMENT_NAME,
     group,
     provider: statsigReady ? 'statsig' : 'internal',
   });
-  return group;
+  return { user: toCamel(data), group };
 }

@@ -1,6 +1,6 @@
 import { Expo } from 'expo-server-sdk';
 import cron from 'node-cron';
-import { User, Meal } from '../db.js';
+import { supabase, toCamel } from '../db.js';
 import { logEvent } from './events.js';
 
 const expo = new Expo();
@@ -17,28 +17,43 @@ export async function sendPush(token, title, body, data = {}) {
   }
 }
 
+async function listPushTargets() {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('blocked', false)
+    .not('expo_push_token', 'is', null);
+  if (error) throw error;
+  return toCamel(data);
+}
+
 export async function sendDailyReminders() {
-  const users = await User.find({ blocked: false, expoPushToken: { $ne: null } });
+  const users = await listPushTargets();
   console.log(`[push] daily reminder → ${users.length} users`);
   for (const u of users) {
     await sendPush(u.expoPushToken, '🍽️ Time to log your meal!', 'Tap to log what you ate today.');
-    await logEvent(u._id, 'push_reminder_sent', {});
+    await logEvent(u.id, 'push_reminder_sent', {});
   }
 }
 
 export async function sendDailySummaries() {
-  const users = await User.find({ blocked: false, expoPushToken: { $ne: null } });
+  const users = await listPushTargets();
   const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
   console.log(`[push] daily summary → ${users.length} users`);
   for (const u of users) {
-    const count = await Meal.countDocuments({ userId: u._id, loggedAt: { $gte: startOfDay } });
+    const { count } = await supabase
+      .from('meals')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', u.id)
+      .gte('logged_at', startOfDay.toISOString());
+    const c = count || 0;
     await sendPush(
       u.expoPushToken,
       '📊 Your daily summary',
-      `You logged ${count} meal${count === 1 ? '' : 's'} today.`,
-      { type: 'daily_summary', count }
+      `You logged ${c} meal${c === 1 ? '' : 's'} today.`,
+      { type: 'daily_summary', count: c }
     );
-    await logEvent(u._id, 'push_summary_sent', { count });
+    await logEvent(u.id, 'push_summary_sent', { count: c });
   }
 }
 
